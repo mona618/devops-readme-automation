@@ -1,0 +1,39 @@
+name: Validate README Markers
+
+on:
+  pull_request:
+    paths:
+      - README.md
+      - ".github/workflows/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate README markers
+        shell: python
+        run: |
+          from pathlib import Path
+
+          content = Path("README.md").read_text(encoding="utf-8")
+
+          start_marker = "<!-- ACTIVITY:START -->"
+          end_marker = "<!-- ACTIVITY:END -->"
+
+          if start_marker not in content:
+              raise RuntimeError("Missing ACTIVITY:START marker")
+
+          if end_marker not in content:
+              raise RuntimeError("Missing ACTIVITY:END marker")
+
+          if content.index(start_marker) > content.index(end_marker):
+              raise RuntimeError("README activity markers are in the wrong order")
+
+          print("README activity markers are valid.")
