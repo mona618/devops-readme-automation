@@ -7,11 +7,11 @@ This repository demonstrates a DevOps workflow using GitHub Actions to automatic
 <!-- ACTIVITY:START -->
 ## Latest Commits
 
-- `2b6cce2` Merge pull request #2 from mona618/feature/readme-automation — **HO TSAI-NI** (2026-09-29)
-- `454e8ac` ci: add README auto-update workflow — **HO TSAI-NI** (2026-09-29)
-- `f8e5ed6` docs: add README activity markers — **HO TSAI-NI** (2026-09-29)
-- `c482752` Enhance README with project management and activity info — **HO TSAI-NI** (2026-09-29)
-- `da0c61d` Initial commit — **HO TSAI-NI** (2026-09-29)
+- `ccc6147` Merge pull request #3 from mona618/feature/readme-validator — **HO TSAI-NI** (2026-09-29)
+- `29d4af9` fix: restore README activity marker — **HO TSAI-NI** (2026-09-29)
+- `1175b6a` fix: restore README activity marker — **HO TSAI-NI** (2026-09-29)
+- `ee0cab1` test: verify README marker validation — **HO TSAI-NI** (2026-09-29)
+- `bd1ed17` ci: add README marker validation workflow — **HO TSAI-NI** (2026-09-29)
 <!-- ACTIVITY:END -->
 
 ## Project Management
