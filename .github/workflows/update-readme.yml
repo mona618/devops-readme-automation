@@ -1,0 +1,88 @@
+name: Update README Activity
+
+on:
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - README.md
+
+  schedule:
+    - cron: "0 0 * * *"
+
+permissions:
+  contents: write
+
+jobs:
+  update-readme:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.REPO_TOKEN }}
+          fetch-depth: 0
+
+      - name: Generate recent activity
+        shell: bash
+        run: |
+          {
+            echo "## Latest Commits"
+            echo ""
+            git log \
+              --pretty=format:'- `%h` %s — **%an** (%ad)' \
+              --date=short \
+              --max-count=5 \
+              --invert-grep \
+              --grep='docs: auto-update README activity'
+          } > recent_activity.txt
+
+      - name: Update README activity section
+        shell: python
+        run: |
+          from pathlib import Path
+
+          readme_path = Path("README.md")
+          activity_path = Path("recent_activity.txt")
+
+          start_marker = "<!-- ACTIVITY:START -->"
+          end_marker = "<!-- ACTIVITY:END -->"
+
+          readme = readme_path.read_text(encoding="utf-8")
+          activity = activity_path.read_text(encoding="utf-8").strip()
+
+          if start_marker not in readme or end_marker not in readme:
+              raise RuntimeError("README activity markers are missing.")
+
+          before, remainder = readme.split(start_marker, 1)
+          _, after = remainder.split(end_marker, 1)
+
+          updated = (
+              before
+              + start_marker
+              + "\n"
+              + activity
+              + "\n"
+              + end_marker
+              + after
+          )
+
+          readme_path.write_text(updated, encoding="utf-8")
+
+      - name: Commit README changes
+        shell: bash
+        run: |
+          if git diff --quiet README.md; then
+            echo "README is already up to date."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add README.md
+          git commit -m "docs: auto-update README activity"
+          git push
