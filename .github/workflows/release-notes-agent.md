@@ -9,7 +9,8 @@ permissions:
 
 engine:
   id: copilot
-  model: claude-haiku-4.5
+
+model: auto
 
 safe-outputs:
   create-issue:
