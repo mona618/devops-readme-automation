@@ -7,6 +7,10 @@ permissions:
   issues: read
   pull-requests: read
 
+engine:
+  id: copilot
+  model: claude-haiku-4.5
+
 safe-outputs:
   create-issue:
     title-prefix: "[release-notes] "
