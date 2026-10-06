@@ -7,7 +7,7 @@ permissions:
   contents: read
 
 jobs:
-    build:
+  build:
     name: Build Artifact
     runs-on: ubuntu-latest
 
@@ -80,6 +80,7 @@ jobs:
           NOTE: ${{ vars.RELEASE_NOTE }}
         run: |
           gh release delete "$TAG" --yes --cleanup-tag || true
+
           gh release create "$TAG" build.zip \
             --title "$TAG" \
             --notes "$NOTE"
@@ -107,6 +108,7 @@ jobs:
           NOTE: ${{ vars.RELEASE_NOTE }}
         run: |
           gh release delete "$TAG" --yes --cleanup-tag || true
+
           gh release create "$TAG" build.zip \
             --title "$TAG" \
             --notes "$NOTE"
@@ -134,6 +136,7 @@ jobs:
           NOTE: ${{ vars.RELEASE_NOTE }}
         run: |
           gh release delete "$TAG" --yes --cleanup-tag || true
+
           gh release create "$TAG" build.zip \
             --title "$TAG" \
             --notes "$NOTE"
