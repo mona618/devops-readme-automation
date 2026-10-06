@@ -7,11 +7,11 @@ This repository demonstrates a DevOps workflow using GitHub Actions to automatic
 <!-- ACTIVITY:START -->
 ## Latest Commits
 
+- `1bf532d` ci: add guarded AI release notes agent — **mona618** (2026-10-06)
 - `52cc833` git add .github/workflows/release-notes-agent.md git add .github/workflows/release-notes-agent.lock.yml git commit -m "ci: add guarded AI release notes agent" git push — **HO TSAI-NI** (2026-10-06)
 - `8fd35ec` ci: add pre-build validation and dynamic versioning — **HO TSAI-NI** (2026-10-06)
 - `8f48119` ci: add dynamic release versioning — **HO TSAI-NI** (2026-10-06)
 - `162f1c7` ci: add pre-build validation — **HO TSAI-NI** (2026-10-06)
-- `052368f` fix: move deployment pipeline to correct workflow directory — **HO TSAI-NI** (2026-10-06)
 <!-- ACTIVITY:END -->
 
 ## Project Management
