@@ -15,6 +15,20 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Pre-build validation
+        shell: bash
+        run: |
+          echo "Checking required repository files..."
+
+          test -f README.md
+          test -f .github/workflows/update-readme.yml
+          test -f .github/workflows/validate-readme.yml
+
+          grep -q "<!-- ACTIVITY:START -->" README.md
+          grep -q "<!-- ACTIVITY:END -->" README.md
+
+          echo "Pre-build validation passed."
+
       - name: Validate README
         run: |
           test -f README.md
