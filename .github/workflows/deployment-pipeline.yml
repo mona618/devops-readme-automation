@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       simulate_test_failure:
-        description: "Intentionally fail after integration tests to verify the release gate"
+        description: "Run a deliberately failing pytest assertion to verify the release gate"
         required: false
         type: boolean
         default: false
@@ -117,11 +117,9 @@ jobs:
         run: mkdir -p reports
       - name: Run integration tests
         run: python -m pytest tests/integration --junitxml=reports/integration-${{ matrix.python-version }}.xml
-      - name: Controlled failure injection
+      - name: Demonstrate a failing pytest assertion
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_test_failure }}
-        run: |
-          echo "::error title=Test gate demonstration::Intentional failure requested for this workflow run."
-          exit 1
+        run: python -m pytest tests/demo --junitxml=reports/failure-demo-${{ matrix.python-version }}.xml
       - name: Upload integration test report
         if: always()
         uses: actions/upload-artifact@v4
