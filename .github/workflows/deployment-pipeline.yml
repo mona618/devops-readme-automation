@@ -1,142 +1,230 @@
-name: CI/CD Deployment Pipeline
+name: Build-Test-Release
 
 on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - README.md
+  pull_request:
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      simulate_test_failure:
+        description: "Intentionally fail after integration tests to verify the release gate"
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
 
 jobs:
   build:
-    name: Build Artifact
+    name: Build artifact
     runs-on: ubuntu-latest
-
     outputs:
-      version: ${{ steps.version.outputs.version }}
-
+      version: ${{ steps.meta.outputs.version }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Generate dynamic version
-        id: version
-        run: |
-          VERSION="1.0.${{ github.run_number }}"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "Generated version: $VERSION"
-
-      - name: Pre-build validation
-        shell: bash
-        run: |
-          echo "Checking required repository files..."
-
-          test -f README.md
-          test -f .github/workflows/update-readme.yml
-          test -f .github/workflows/validate-readme.yml
-
-          grep -q "<!-- ACTIVITY:START -->" README.md
-          grep -q "<!-- ACTIVITY:END -->" README.md
-
-          echo "Pre-build validation passed."
-
-      - name: Validate README
-        run: |
-          test -f README.md
-          echo "README validation passed."
-
-      - name: Build package
-        run: |
-          mkdir -p dist
-          cp README.md dist/
-          cp -r .github dist/
-          zip -r build.zip dist
-
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install build and test dependencies
+        run: python -m pip install -r requirements-test.txt
+      - name: Generate build version
+        id: meta
+        run: echo "version=1.0.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+      - name: Validate and package software
+        run: python scripts/build.py --version "1.0.${GITHUB_RUN_NUMBER}" --output dist/build.zip
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: build-artifact
-          path: build.zip
+          path: dist/build.zip
+          if-no-files-found: error
+          retention-days: 14
 
-  deploy-dev:
-    name: Deploy to Dev
+  test-unit:
+    name: Unit tests (Python ${{ matrix.python-version }})
     needs: build
     runs-on: ubuntu-latest
-    environment: dev
-
-    permissions:
-      contents: write
-
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      TEST_ENV: staging
     steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-test.txt
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: build-artifact
+          path: dist
+      - name: Prepare report directory
+        run: mkdir -p reports
+      - name: Run unit tests with coverage gate
+        run: >-
+          python -m pytest tests/unit
+          --junitxml=reports/unit-${{ matrix.python-version }}.xml
+          --cov=app --cov-branch --cov-report=term-missing
+          --cov-report=xml:reports/coverage-${{ matrix.python-version }}.xml
+          --cov-fail-under=90
+      - name: Upload unit test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports-py${{ matrix.python-version }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14
 
-      - name: Create Dev Release
+  test-integration:
+    name: Integration tests (Python ${{ matrix.python-version }})
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12"]
+    env:
+      TEST_ENV: staging
+      BUILD_ARTIFACT: dist/build.zip
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-test.txt
+      - name: Download build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: dist
+      - name: Prepare report directory
+        run: mkdir -p reports
+      - name: Run integration tests
+        run: python -m pytest tests/integration --junitxml=reports/integration-${{ matrix.python-version }}.xml
+      - name: Controlled failure injection
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.simulate_test_failure }}
+        run: |
+          echo "::error title=Test gate demonstration::Intentional failure requested for this workflow run."
+          exit 1
+      - name: Upload integration test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: integration-test-reports-py${{ matrix.python-version }}
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14
+
+  deploy-dev:
+    name: Release to Dev
+    needs: [build, test-unit, test-integration]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: dist
+      - name: Create Dev release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: dev-v${{ needs.build.outputs.version }}
           NOTE: ${{ vars.RELEASE_NOTE }}
-        run: |
-          gh release delete "$TAG" --yes --cleanup-tag || true
-
-          gh release create "$TAG" build.zip \
-            --title "$TAG" \
-            --notes "$NOTE"
+        run: gh release create "$TAG" dist/build.zip --title "$TAG" --notes "$NOTE"
 
   deploy-staging:
-    name: Deploy to Staging
-    needs: deploy-dev
+    name: Release to Staging
+    needs: [build, test-unit, test-integration, deploy-dev]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     environment: staging
-
     permissions:
       contents: write
-
     steps:
-      - name: Download build artifact
+      - name: Download tested build artifact
         uses: actions/download-artifact@v4
         with:
           name: build-artifact
-
-      - name: Create Staging Release
+          path: dist
+      - name: Create Staging release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: staging-v${{ needs.build.outputs.version }}
           NOTE: ${{ vars.RELEASE_NOTE }}
-        run: |
-          gh release delete "$TAG" --yes --cleanup-tag || true
+        run: gh release create "$TAG" dist/build.zip --title "$TAG" --notes "$NOTE"
 
-          gh release create "$TAG" build.zip \
-            --title "$TAG" \
-            --notes "$NOTE"
-
-  deploy-production:
-    name: Deploy to Production
-    needs: deploy-staging
+  test-production:
+    name: Production smoke tests
+    needs: [build, test-unit, test-integration, deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    environment: production
-
-    permissions:
-      contents: write
-
+    env:
+      TEST_ENV: prod
+      BUILD_ARTIFACT: dist/build.zip
     steps:
-      - name: Download build artifact
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: python -m pip install -r requirements-test.txt
+      - name: Download staged build artifact
         uses: actions/download-artifact@v4
         with:
           name: build-artifact
+          path: dist
+      - name: Prepare report directory
+        run: mkdir -p reports
+      - name: Run production smoke tests
+        run: python -m pytest tests/smoke --junitxml=reports/production-smoke.xml
+      - name: Upload production smoke report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: production-smoke-report
+          path: reports/
+          if-no-files-found: warn
+          retention-days: 14
 
-      - name: Create Production Release
+  deploy-production:
+    name: Release to Production
+    needs: [build, test-unit, test-integration, test-production, deploy-staging]
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: production
+    permissions:
+      contents: write
+    steps:
+      - name: Download tested build artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: build-artifact
+          path: dist
+      - name: Create Production release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: prod-v${{ needs.build.outputs.version }}
           NOTE: ${{ vars.RELEASE_NOTE }}
-        run: |
-          gh release delete "$TAG" --yes --cleanup-tag || true
+        run: gh release create "$TAG" dist/build.zip --title "$TAG" --notes "$NOTE"
 
-          gh release create "$TAG" build.zip \
-            --title "$TAG" \
-            --notes "$NOTE"
