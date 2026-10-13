@@ -9,11 +9,11 @@ This repository demonstrates a DevOps workflow that updates repository activity 
 <!-- ACTIVITY:START -->
 ## Latest Commits
 
+- `c16d597` test(ci): add opt-in failing assertion for release gate demo — **HO TSAI-NI** (2026-10-13)
 - `9165f7f` fix(ci): configure pip cache dependency path — **HO TSAI-NI** (2026-10-13)
 - `d61b708` feat(ci): gate multi-environment releases on tests — **HO TSAI-NI** (2026-10-13)
 - `a56ded3` fix: use Copilot Auto model for free plan — **mona618** (2026-10-06)
 - `f3bfbc1` fix: use supported Copilot model for release notes agent — **mona618** (2026-10-06)
-- `1bf532d` ci: add guarded AI release notes agent — **mona618** (2026-10-06)
 <!-- ACTIVITY:END -->
 
 ## Build, Test, and Release
